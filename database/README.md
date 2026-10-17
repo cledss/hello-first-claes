@@ -118,3 +118,21 @@ the upcoming TLS cipher removal does not affect modern browser HTTPS clients.
    automatic retries are not enabled to avoid duplicate messages or charges.
 
 Lovable AI calls consume workspace AI credits; the API returns a clear error on 402 or 429.
+
+## Voicemail-first Second Claes
+
+Apply `database/migrations/20261017_voicemail_queue.sql` after the reply migration.
+The public-facing Level 1 experience is a digital answering machine, **not a general AI chat**.
+Each successful message is stored in the durable PostgreSQL queue and gets a fixed,
+non-generative Swedish receipt in the same transaction. The owner-only inbox displays
+pending messages with the sender's verified email and lets First Claes mark them handled.
+No email forwarding, notifications or automated personal response is implied.
+
+Limits are enforced atomically in PostgreSQL: **3 messages / 10 minutes per account**,
+**20 / 24 hours per account**, **10 pending per account**, and **200 pending globally**.
+All limits are inclusive of concurrent submissions via a transaction-scoped advisory lock.
+Rejected messages do not enter the queue and do not receive a success receipt.
+Legacy message-sending RPCs are revoked to prevent bypass. The owner inbox requires a
+row in `secondself.owner` for First Claes; if no owner is provisioned, messages remain
+queued safely but cannot yet be marked handled through the UI. Provision owner access
+only after independent identity verification; never infer it from a name or email.
