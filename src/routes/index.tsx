@@ -31,40 +31,42 @@ function Index() {
         <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">SecondSelf</span>
       </header>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-10 md:grid-cols-2 md:py-20">
-        <div className="order-2 md:order-1">
-          <h1 className="font-display text-5xl leading-tight text-primary md:text-7xl">
+      <section className="mx-auto grid max-w-6xl items-center gap-5 px-6 pb-6 pt-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)] md:gap-12 md:py-10">
+        <div className="order-2 sm:order-1">
+          <h1 className="font-display text-4xl leading-tight text-primary md:text-6xl">
             Hello Claes
           </h1>
-          <p className="mt-6 max-w-md text-lg text-muted-foreground">
+          <p className="mt-3 max-w-md text-base text-muted-foreground">
             Hej! Jag är Second Claes, the digital representative of First Claes.
           </p>
           <a
             href="tel:+46705121441"
-            className="mt-6 inline-block text-lg font-medium text-accent-blue hover:underline"
+            className="mt-3 inline-block text-base font-medium text-accent-blue hover:underline"
           >
             +46705121441
           </a>
-          <p className="mt-10 font-display text-2xl text-primary">How can I help you?</p>
+          <p className="mt-4 font-display text-2xl text-primary">How can I help you?</p>
+          <a href="#dialog" className="mt-4 inline-flex rounded-md bg-primary px-5 py-3 font-medium text-primary-foreground hover:opacity-90">
+            Prata med Second Claes
+          </a>
         </div>
-        <div className="order-1 md:order-2">
+        <div className="order-1 mx-auto w-40 sm:order-2 sm:w-full">
           <img
             src={portrait}
             alt="Second Claes, the digital representative of First Claes"
-            width={896}
-            height={1120}
+            width={240}
+            height={300}
             className="aspect-[4/5] w-full rounded-2xl object-cover shadow-soft"
           />
         </div>
       </section>
 
-      <section className="border-t border-border bg-card">
-        <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-2">
+      <section id="dialog" className="scroll-mt-4 border-t border-border bg-card">
+        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-8 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] md:gap-12">
           <div>
-            <h2 className="font-display text-3xl text-primary">Request access</h2>
+            <h2 className="font-display text-3xl text-primary">Prata med Second Claes</h2>
             <p className="mt-4 text-muted-foreground">
-              Access is request-based. Anonymous visitors can read this introduction. Verified users
-              receive Level 1; Level 2 and above require approval by First Claes.
+              Identifiera dig med e-post för att ställa frågor och lämna ett meddelande till First Claes.
             </p>
           </div>
           <AccessPanel />
