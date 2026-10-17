@@ -78,16 +78,38 @@ describe("email access flow", () => {
     }));
     render(<AccessPanel />);
     await screen.findByText("Level 1 access · Second Claes");
-    fireEvent.change(screen.getByLabelText("Your message"), {
+    fireEvent.change(screen.getByLabelText("Fråga eller meddelande till First Claes"), {
       target: { value: "Please call me" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Lämna meddelande" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skicka" }));
     await screen.findByText("Tack för ditt meddelande.");
     expect(screen.getByRole("status")).toHaveTextContent("Köplats: 2");
     expect(client.rpc).toHaveBeenCalledWith("secondself_voicemail", {
       message_body: "Please call me",
     });
     expect(screen.queryByText("Meddelanden till First Claes")).not.toBeInTheDocument();
+  });
+
+  it("answers a pre-MCP question in text without queuing a message", async () => {
+    client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "verified-session-token" } },
+      error: null,
+    });
+    client.rpc.mockImplementation(async (name: string) => ({
+      error: null,
+      data: name === "secondself_access" ? { level: 1, is_owner: false } : [],
+    }));
+    render(<AccessPanel />);
+    await screen.findByText("Level 1 access · Second Claes");
+    fireEvent.change(screen.getByLabelText("Fråga eller meddelande till First Claes"), {
+      target: { value: "Who are you?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Skicka" }));
+    await screen.findByText(/personlig digital assistent till First Claes/);
+    expect(client.rpc).not.toHaveBeenCalledWith("secondself_voicemail", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "What can you do?" }));
+    await screen.findByText(/ingen allmän AI-chatt/);
+    expect(client.rpc).not.toHaveBeenCalledWith("secondself_voicemail", expect.anything());
   });
 
   it("does not grant access when the server denies the session", async () => {
