@@ -154,8 +154,8 @@ export function AccessPanel() {
         <section className="space-y-4" aria-label="Your SecondSelf access">
           <p>Level {level} access · Second Claes</p>
           <p className="text-sm">
-            Hej! Jag är Second Claes, assistent till First Claes. Lämna ett meddelande så
-            lägger jag det i kön för First Claes. Jag är en digital telefonsvarare.
+            Hej! Jag är Second Claes, assistent till First Claes. Lämna ett meddelande så lägger jag
+            det i kön för First Claes. Jag är en digital telefonsvarare.
           </p>
           <ul>
             {messages.map((message) => (
@@ -218,10 +218,9 @@ export function AccessPanel() {
                       className={buttonClass}
                       onClick={() =>
                         void run(async () => {
-                          const { error } = await getAuthClient()!.rpc(
-                            "secondself_mark_handled",
-                            { message_id: item.message_id },
-                          );
+                          const { error } = await getAuthClient()!.rpc("secondself_mark_handled", {
+                            message_id: item.message_id,
+                          });
                           if (error) throw error;
                           await load();
                           setStatus("Meddelandet markerat som hanterat.");
