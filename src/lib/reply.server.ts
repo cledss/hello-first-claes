@@ -40,9 +40,8 @@ export const replyAsSecondClaes = createServerFn({ method: "POST" })
       throw new Error("Message could not be saved");
     }
 
-    const { data: conversation, error: conversationError } = await client.rpc(
-      "secondself_conversation",
-    );
+    const { data: conversation, error: conversationError } =
+      await client.rpc("secondself_conversation");
     if (conversationError || !Array.isArray(conversation)) {
       throw new Error("Conversation could not be loaded");
     }
