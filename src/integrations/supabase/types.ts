@@ -79,6 +79,7 @@ export type Database = {
         Args: { approved_level: number; subject: string }
         Returns: undefined
       }
+      secondself_conversation: { Args: never; Returns: Json }
       secondself_messages: { Args: never; Returns: Json }
       secondself_request: {
         Args: { requested_level: number }
@@ -86,6 +87,14 @@ export type Database = {
       }
       secondself_revoke: { Args: { subject: string }; Returns: undefined }
       secondself_send: { Args: { body: string }; Returns: undefined }
+      secondself_send_message: {
+        Args: { message_body: string }
+        Returns: number
+      }
+      secondself_store_reply: {
+        Args: { p_body: string; p_message_id: number }
+        Returns: undefined
+      }
       secondself_trusted: { Args: never; Returns: undefined }
     }
     Enums: {
