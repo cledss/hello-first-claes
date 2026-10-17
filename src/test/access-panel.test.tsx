@@ -24,10 +24,14 @@ describe("email access flow", () => {
       data: name === "secondself_access" ? { level: 1 } : [],
     }));
     render(<AccessPanel />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Example User" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.invalid" } });
     fireEvent.click(screen.getByRole("button", { name: "Request access" }));
     await screen.findByLabelText("Email verification code");
-    expect(client.auth.signInWithOtp).toHaveBeenCalledWith({ email: "user@example.invalid" });
+    expect(client.auth.signInWithOtp).toHaveBeenCalledWith({
+      email: "user@example.invalid",
+      options: { data: { full_name: "Example User" } },
+    });
     fireEvent.change(screen.getByLabelText("Email verification code"), {
       target: { value: "123456" },
     });
@@ -47,6 +51,7 @@ describe("email access flow", () => {
     client.auth.signInWithOtp.mockResolvedValue({ error: null });
     client.auth.verifyOtp.mockResolvedValue({ error: new Error("Invalid or expired code") });
     render(<AccessPanel />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Example User" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.invalid" } });
     fireEvent.click(screen.getByRole("button", { name: "Request access" }));
     await screen.findByLabelText("Email verification code");
@@ -66,6 +71,7 @@ describe("email access flow", () => {
   it("does not claim success when the provider fails", async () => {
     client.auth.signInWithOtp.mockResolvedValue({ error: new Error("Unavailable") });
     render(<AccessPanel />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Example User" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.invalid" } });
     fireEvent.click(screen.getByRole("button", { name: "Request access" }));
     await waitFor(() =>
