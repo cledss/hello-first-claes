@@ -14,7 +14,7 @@ export const replyAsSecondClaes = createServerFn({ method: "POST" })
     const publishable =
       process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
     const serviceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
-    const apiKey = process.env["OPENAI_API_KEY"];
+    const apiKey = process.env["LOVABLE_API_KEY"];
     if (!url || !publishable || !serviceKey || !apiKey) {
       throw new Error("Second Claes replies are not configured yet");
     }
@@ -46,14 +46,15 @@ export const replyAsSecondClaes = createServerFn({ method: "POST" })
       throw new Error("Conversation could not be loaded");
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        "Lovable-API-Key": apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: "google/gemini-2.5-flash",
         max_tokens: 500,
         messages: [
           { role: "system", content: SECOND_CLAES_INSTRUCTIONS },
@@ -62,6 +63,8 @@ export const replyAsSecondClaes = createServerFn({ method: "POST" })
       }),
       signal: AbortSignal.timeout(25000),
     });
+    if (response.status === 402) throw new Error("AI credits are exhausted");
+    if (response.status === 429) throw new Error("AI is busy. Please try again later");
     if (!response.ok) throw new Error("Second Claes is temporarily unavailable");
     const result = (await response.json()) as {
       choices?: Array<{ message?: { content?: string | null } }>;
