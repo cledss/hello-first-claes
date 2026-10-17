@@ -228,9 +228,9 @@ describe.sequential("SecondSelf database authorization", () => {
     await db.query("select public.secondself_revoke($1)", [alice]);
     await login(alice);
     await expect(db.query("select public.secondself_messages()")).rejects.toThrow(/Access denied/);
-    await expect(db.query("select public.secondself_voicemail('after revocation')")).rejects.toThrow(
-      /Access denied/,
-    );
+    await expect(
+      db.query("select public.secondself_voicemail('after revocation')"),
+    ).rejects.toThrow(/Access denied/);
     await db.exec("reset role");
     await db.query("update auth.users set email_confirmed_at=now() where id=$1", [alice]);
     const audit = await db.query<{ event: string }>(
