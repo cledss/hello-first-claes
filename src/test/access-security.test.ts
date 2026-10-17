@@ -137,8 +137,9 @@ describe.sequential("SecondSelf database authorization", () => {
     const aliceConversation = await db.query<{ conversation: { body: string }[] }>(
       "select public.secondself_conversation() as conversation",
     );
-    expect(aliceConversation.rows[0]!.conversation.some((m) => m.body === "Hello Second Claes"))
-      .toBe(false);
+    expect(
+      aliceConversation.rows[0]!.conversation.some((m) => m.body === "Hello Second Claes"),
+    ).toBe(false);
     await db.exec("reset role");
     await db.query("select set_config('request.jwt.claims', $1, false)", [
       JSON.stringify({ role: "service_role" }),
@@ -159,8 +160,9 @@ describe.sequential("SecondSelf database authorization", () => {
     const privateConversation = await db.query<{ conversation: { body: string }[] }>(
       "select public.secondself_conversation() as conversation",
     );
-    expect(privateConversation.rows[0]!.conversation.some((m) => m.body === "Hello from Second Claes"))
-      .toBe(false);
+    expect(
+      privateConversation.rows[0]!.conversation.some((m) => m.body === "Hello from Second Claes"),
+    ).toBe(false);
   });
 
   it("requires a live session and current verification", async () => {
