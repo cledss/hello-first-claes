@@ -11,8 +11,6 @@ const client = vi.hoisted(() => ({
   rpc: vi.fn(),
 }));
 vi.mock("@/lib/auth", () => ({ getAuthClient: () => client }));
-const reply = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/reply.server", () => ({ replyAsSecondClaes: reply }));
 
 beforeEach(() => {
   vi.stubEnv("VITE_SUPABASE_URL", "https://example.invalid");
@@ -58,7 +56,7 @@ describe("email access flow", () => {
     expect(client.rpc).toHaveBeenCalledWith("secondself_request", { requested_level: 2 });
   });
 
-  it("sends the message to the server and shows a real assistant reply", async () => {
+  it("queues a voicemail and displays the stored acknowledgement", async () => {
     client.auth.getSession.mockResolvedValue({
       data: { session: { access_token: "verified-session-token" } },
       error: null,
@@ -68,34 +66,28 @@ describe("email access flow", () => {
       error: null,
       data:
         name === "secondself_access"
-          ? { level: 1 }
-          : refreshed
-            ? [
-                { id: 1, role: "user", body: "Hello Second Claes", created_at: "2026-10-17" },
-                {
-                  id: 2,
-                  role: "assistant",
-                  body: "Hello! How can I help?",
-                  created_at: "2026-10-17",
-                },
-              ]
-            : [],
+          ? { level: 1, is_owner: false }
+          : name === "secondself_voicemail"
+            ? ((refreshed = true), { queue_position: 2, message_id: 5 })
+            : refreshed
+              ? [
+                  { id: 5, role: "user", body: "Please call me", queue_status: "pending" },
+                  { id: 6, role: "assistant", body: "Tack för ditt meddelande." },
+                ]
+              : [],
     }));
-    reply.mockImplementation(async () => {
-      refreshed = true;
-      return { reply: "Hello! How can I help?" };
-    });
     render(<AccessPanel />);
     await screen.findByText("Level 1 access · Second Claes");
     fireEvent.change(screen.getByLabelText("Your message"), {
-      target: { value: "Hello Second Claes" },
+      target: { value: "Please call me" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send to Second Claes" }));
-    await screen.findByText("Hello! How can I help?");
-    expect(reply).toHaveBeenCalledWith({
-      data: { token: "verified-session-token", body: "Hello Second Claes" },
+    fireEvent.click(screen.getByRole("button", { name: "Lämna meddelande" }));
+    await screen.findByText("Tack för ditt meddelande.");
+    expect(screen.getByRole("status")).toHaveTextContent("Köplats: 2");
+    expect(client.rpc).toHaveBeenCalledWith("secondself_voicemail", {
+      message_body: "Please call me",
     });
-    expect(client.rpc).not.toHaveBeenCalledWith("secondself_send", expect.anything());
+    expect(screen.queryByText("Meddelanden till First Claes")).not.toBeInTheDocument();
   });
 
   it("does not grant access when the server denies the session", async () => {
