@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getAuthClient } from "@/lib/auth";
 
 type Message = { id: number; body: string; created_at: string };
@@ -6,7 +6,6 @@ type Message = { id: number; body: string; created_at: string };
 export function AccessPanel() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [level, setLevel] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -31,7 +30,7 @@ export function AccessPanel() {
     }
   }
 
-  async function load() {
+  const load = useCallback(async () => {
     const client = getAuthClient();
     if (!client) throw new Error("Authentication unavailable");
     const access = await client.rpc("secondself_access");
@@ -44,7 +43,21 @@ export function AccessPanel() {
     if (result.error) throw result.error;
     setLevel(access.data.level);
     setMessages(result.data);
-  }
+  }, []);
+
+  useEffect(() => {
+    const client = getAuthClient();
+    if (!client) return;
+    let active = true;
+    // Supabase completes the emailed magic link when the browser returns here.
+    void client.auth.getSession().then(({ data, error }) => {
+      if (!active || error || !data.session) return;
+      void load().catch(() => {
+        if (active) setStatus("Sign-in succeeded, but access could not be loaded.");
+      });
+    });
+    return () => { active = false; };
+  }, [load]);
 
   return (
     <div className="space-y-4">
@@ -56,28 +69,20 @@ export function AccessPanel() {
             void run(async () => {
               const client = getAuthClient();
               if (!client) throw new Error("Authentication unavailable");
-              if (sent) {
-                const { error } = await client.auth.verifyOtp({
-                  email,
-                  token: code,
-                  type: "email",
-                });
-                if (error) throw error;
-                await load();
-              } else {
-                const { error } = await client.auth.signInWithOtp({
-                  email: email.trim(),
-                  options: { data: { full_name: name.trim() } },
-                });
-                if (error) throw error;
-                setSent(true);
-                setStatus("Check your email for a one-time code.");
-              }
+              const { error } = await client.auth.signInWithOtp({
+                email: email.trim(),
+                options: {
+                  emailRedirectTo: window.location.origin,
+                  data: { full_name: name.trim() },
+                },
+              });
+              if (error) throw error;
+              setSent(true);
+              setStatus("Check your email for a sign-in link. Open it in this browser.");
             });
           }}
         >
-          {!sent && (
-            <label className="block text-sm">
+          <label className="block text-sm">
               Name
               <input
                 type="text"
@@ -89,8 +94,7 @@ export function AccessPanel() {
                 onChange={(event) => setName(event.target.value)}
                 className={inputClass}
               />
-            </label>
-          )}
+          </label>
           <label className="block text-sm">
             Email
             <input
@@ -98,26 +102,13 @@ export function AccessPanel() {
               required
               autoComplete="email"
               value={email}
-              disabled={sent || busy}
+              disabled={busy}
               onChange={(event) => setEmail(event.target.value)}
               className={inputClass}
             />
           </label>
-          {sent && (
-            <label className="block text-sm">
-              Email verification code
-              <input
-                required
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                className={inputClass}
-              />
-            </label>
-          )}
           <button disabled={!configured || busy} className={buttonClass}>
-            {sent ? "Verify and sign in" : "Request access"}
+            {sent ? "Resend sign-in link" : "Request access"}
           </button>
           {sent && (
             <button
@@ -126,7 +117,6 @@ export function AccessPanel() {
               className="ml-3 underline"
               onClick={() => {
                 setSent(false);
-                setCode("");
                 setStatus("");
               }}
             >
@@ -135,7 +125,7 @@ export function AccessPanel() {
           )}
           <p className="text-sm text-muted-foreground">
             {configured
-              ? "Register or sign in with a verified email. Level 1 is granted automatically."
+              ? "A sign-in link will be emailed to you. Verified accounts receive Level 1 automatically."
               : "Sign-in is unavailable until authentication is configured."}
           </p>
         </form>
@@ -205,7 +195,6 @@ export function AccessPanel() {
                 const { error } = await getAuthClient()!.auth.signOut();
                 setLevel(null);
                 setMessages([]);
-                setCode("");
                 setSent(false);
                 if (error) throw error;
               })
