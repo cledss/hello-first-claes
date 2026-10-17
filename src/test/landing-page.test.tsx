@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Route } from "@/routes/index";
 
@@ -30,8 +30,13 @@ describe("Landing page", () => {
   });
 
   it("disables sign-in when provider configuration is missing", () => {
-    render(<Index />);
-
-    expect(screen.getByRole("button", { name: "Request access" })).toBeDisabled();
+    vi.stubEnv("VITE_SUPABASE_URL", "");
+    vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "");
+    try {
+      render(<Index />);
+      expect(screen.getByRole("button", { name: "Request access" })).toBeDisabled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
