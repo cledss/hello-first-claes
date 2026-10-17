@@ -85,6 +85,8 @@ grant execute on function public.secondself_voicemail(text) to authenticated;
 -- Old endpoints bypass the new queue; disable them for new submissions.
 revoke execute on function public.secondself_send(text) from authenticated;
 revoke execute on function public.secondself_send_message(text) from authenticated;
+revoke execute on function secondself.send_message(text) from authenticated;
+revoke execute on function secondself.send_message_returning(text) from authenticated;
 
 -- Extend existing access state without granting any new privileges.
 create or replace function secondself.access_state() returns jsonb
