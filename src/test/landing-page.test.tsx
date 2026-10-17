@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { Route } from "@/routes/index";
 
-const Index = Route.options.component!;
+const Index = Route.options.component;
+if (!Index) throw new Error("Landing page component unavailable");
 
 describe("Landing page", () => {
   it("shows the required Hello Claes copy", () => {
@@ -26,7 +27,7 @@ describe("Landing page", () => {
     const img = screen.getByRole("img", {
       name: "Second Claes, the digital representative of First Claes",
     });
-    expect(img.getAttribute("src")).toContain("second-claes-portrait");
+    expect(img.getAttribute("src")).toContain("second-claes-network.webp");
   });
 
   it("disables sign-in when provider configuration is missing", () => {
