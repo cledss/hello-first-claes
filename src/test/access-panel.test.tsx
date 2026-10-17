@@ -11,6 +11,8 @@ const client = vi.hoisted(() => ({
   rpc: vi.fn(),
 }));
 vi.mock("@/lib/auth", () => ({ getAuthClient: () => client }));
+const reply = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/reply.server", () => ({ replyAsSecondClaes: reply }));
 
 beforeEach(() => {
   vi.stubEnv("VITE_SUPABASE_URL", "https://example.invalid");
@@ -54,6 +56,46 @@ describe("email access flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Request Level 2" }));
     await screen.findByText("Level 2 request pending. First Claes must approve it.");
     expect(client.rpc).toHaveBeenCalledWith("secondself_request", { requested_level: 2 });
+  });
+
+  it("sends the message to the server and shows a real assistant reply", async () => {
+    client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "verified-session-token" } },
+      error: null,
+    });
+    let refreshed = false;
+    client.rpc.mockImplementation(async (name: string) => ({
+      error: null,
+      data:
+        name === "secondself_access"
+          ? { level: 1 }
+          : refreshed
+            ? [
+                { id: 1, role: "user", body: "Hello Second Claes", created_at: "2026-10-17" },
+                {
+                  id: 2,
+                  role: "assistant",
+                  body: "Hello! How can I help?",
+                  created_at: "2026-10-17",
+                },
+              ]
+            : [],
+    }));
+    reply.mockImplementation(async () => {
+      refreshed = true;
+      return { reply: "Hello! How can I help?" };
+    });
+    render(<AccessPanel />);
+    await screen.findByText("Level 1 access · Second Claes");
+    fireEvent.change(screen.getByLabelText("Your message"), {
+      target: { value: "Hello Second Claes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send to Second Claes" }));
+    await screen.findByText("Hello! How can I help?");
+    expect(reply).toHaveBeenCalledWith({
+      data: { token: "verified-session-token", body: "Hello Second Claes" },
+    });
+    expect(client.rpc).not.toHaveBeenCalledWith("secondself_send", expect.anything());
   });
 
   it("does not grant access when the server denies the session", async () => {
