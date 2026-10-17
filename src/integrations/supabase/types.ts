@@ -80,7 +80,12 @@ export type Database = {
         Returns: undefined
       }
       secondself_conversation: { Args: never; Returns: Json }
+      secondself_mark_handled: {
+        Args: { message_id: number }
+        Returns: undefined
+      }
       secondself_messages: { Args: never; Returns: Json }
+      secondself_owner_inbox: { Args: never; Returns: Json }
       secondself_request: {
         Args: { requested_level: number }
         Returns: undefined
@@ -96,6 +101,7 @@ export type Database = {
         Returns: undefined
       }
       secondself_trusted: { Args: never; Returns: undefined }
+      secondself_voicemail: { Args: { message_body: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
