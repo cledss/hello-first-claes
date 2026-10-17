@@ -24,7 +24,7 @@ export function AccessPanel() {
     try {
       await action();
     } catch {
-      setStatus("The request could not be completed. Check your code or try again.");
+      setStatus("The request could not be completed. Check your email or try again.");
     } finally {
       setBusy(false);
     }
@@ -56,7 +56,9 @@ export function AccessPanel() {
         if (active) setStatus("Sign-in succeeded, but access could not be loaded.");
       });
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [load]);
 
   return (
@@ -83,17 +85,17 @@ export function AccessPanel() {
           }}
         >
           <label className="block text-sm">
-              Name
-              <input
-                type="text"
-                required
-                maxLength={120}
-                autoComplete="name"
-                value={name}
-                disabled={busy}
-                onChange={(event) => setName(event.target.value)}
-                className={inputClass}
-              />
+            Name
+            <input
+              type="text"
+              required
+              maxLength={120}
+              autoComplete="name"
+              value={name}
+              disabled={busy}
+              onChange={(event) => setName(event.target.value)}
+              className={inputClass}
+            />
           </label>
           <label className="block text-sm">
             Email
