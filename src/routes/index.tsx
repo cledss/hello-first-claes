@@ -46,7 +46,10 @@ function Index() {
             +46705121441
           </a>
           <p className="mt-4 font-display text-2xl text-primary">How can I help you?</p>
-          <a href="#dialog" className="mt-4 inline-flex rounded-md bg-primary px-5 py-3 font-medium text-primary-foreground hover:opacity-90">
+          <a
+            href="#dialog"
+            className="mt-4 inline-flex rounded-md bg-primary px-5 py-3 font-medium text-primary-foreground hover:opacity-90"
+          >
             Prata med Second Claes
           </a>
         </div>
@@ -66,7 +69,8 @@ function Index() {
           <div>
             <h2 className="font-display text-3xl text-primary">Prata med Second Claes</h2>
             <p className="mt-4 text-muted-foreground">
-              Identifiera dig med e-post för att ställa frågor och lämna ett meddelande till First Claes.
+              Identifiera dig med e-post för att ställa frågor och lämna ett meddelande till First
+              Claes.
             </p>
           </div>
           <AccessPanel />
