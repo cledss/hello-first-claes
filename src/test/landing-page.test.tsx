@@ -29,6 +29,15 @@ describe("Landing page", () => {
     expect(img.getAttribute("src")).toContain("second-claes-portrait");
   });
 
+  it("prioritizes the conversation with a visible dialogue anchor", () => {
+    render(<Index />);
+    expect(screen.getByRole("link", { name: "Prata med Second Claes" })).toHaveAttribute(
+      "href",
+      "#dialog",
+    );
+    expect(document.querySelector("#dialog")).toBeInTheDocument();
+  });
+
   it("disables sign-in when provider configuration is missing", () => {
     vi.stubEnv("VITE_SUPABASE_URL", "");
     vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "");
