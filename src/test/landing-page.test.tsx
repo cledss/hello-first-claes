@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Route } from "@/routes/index";
 
@@ -29,9 +29,14 @@ describe("Landing page", () => {
     expect(img.getAttribute("src")).toContain("second-claes-portrait");
   });
 
-  it("keeps the access request form inert until real auth exists", () => {
-    render(<Index />);
-
-    expect(screen.getByRole("button", { name: "Request access" })).toBeDisabled();
+  it("disables sign-in when provider configuration is missing", () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "");
+    vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "");
+    try {
+      render(<Index />);
+      expect(screen.getByRole("button", { name: "Request access" })).toBeDisabled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

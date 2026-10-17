@@ -38,3 +38,7 @@ bun run dev
 - TypeScript
 - React
 - Tailwind CSS
+
+## Authentication
+
+See [verified email setup and database migration](database/README.md) before enabling sign-in.
