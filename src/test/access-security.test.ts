@@ -39,7 +39,14 @@ beforeAll(async () => {
     grant execute on function auth.jwt(), auth.uid(), auth.role() to anon, authenticated, service_role;
   `);
   await db.exec(readFileSync("database/schema.sql", "utf8"));
-  await db.exec(readFileSync("database/migrations/20261017_second_claes_replies.sql", "utf8"));
+  const migration = readFileSync("database/migrations/20261017_second_claes_replies.sql", "utf8");
+  try {
+    await db.exec(migration);
+  } catch (error) {
+    const position = Number((error as { position?: string }).position);
+    console.error("Migration SQL error near:", migration.slice(position - 90, position + 90));
+    throw error;
+  }
   for (const [id, verified] of [
     [alice, true],
     [bob, true],
