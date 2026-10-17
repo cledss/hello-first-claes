@@ -26,8 +26,15 @@ export function AccessPanel() {
     setStatus("");
     try {
       await action();
-    } catch {
-      setStatus("The request could not be completed. Check your email or try again.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      if (detail.includes("Rate limit")) {
+        setStatus("För många meddelanden. Försök igen om en stund.");
+      } else if (detail.includes("Queue limit") || detail.includes("Queue temporarily full")) {
+        setStatus("Kön är full. Försök igen senare.");
+      } else {
+        setStatus("The request could not be completed. Check your email or try again.");
+      }
     } finally {
       setBusy(false);
     }
