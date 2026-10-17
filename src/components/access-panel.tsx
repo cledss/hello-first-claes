@@ -135,8 +135,7 @@ export function AccessPanel() {
         <section className="space-y-4" aria-label="Your SecondSelf access">
           <p>Level {level} access · Second Claes</p>
           <p className="text-sm">
-            Public capabilities: introductions and conversation. Your messages and Second Claes\u0027s
-            replies are private to your account. Privileged information requires First Claes\u0027s approval.
+            Conversations are private to your account. Privileged access requires owner approval.
           </p>
           <ul>
             {messages.map((message) => (
