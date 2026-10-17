@@ -26,18 +26,20 @@ async function login(id: string | null, role = "authenticated") {
 
 beforeAll(async () => {
   await db.exec(`
-    create role anon; create role authenticated;
+    create role anon; create role authenticated; create role service_role;
     create schema auth;
     create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz,
       is_anonymous boolean default false, banned_until timestamptz, raw_user_meta_data jsonb);
     create table auth.sessions (id uuid primary key, user_id uuid references auth.users, not_after timestamptz);
     create function auth.jwt() returns jsonb language sql stable as
       $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
-    create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt()->>'sub')::uuid $$;
+    create function auth.uid() returns uuid language sql stable as $ select (auth.jwt()->>'sub')::uuid $;
+    create function auth.role() returns text language sql stable as $ select auth.jwt()->>'role' $;
     grant usage on schema public, auth to anon, authenticated;
-    grant execute on function auth.jwt(), auth.uid() to anon, authenticated;
+    grant execute on function auth.jwt(), auth.uid(), auth.role() to anon, authenticated, service_role;
   `);
   await db.exec(readFileSync("database/schema.sql", "utf8"));
+  await db.exec(readFileSync("database/migrations/20261017_second_claes_replies.sql", "utf8"));
   for (const [id, verified] of [
     [alice, true],
     [bob, true],
@@ -112,6 +114,53 @@ describe.sequential("SecondSelf database authorization", () => {
       "select public.secondself_messages() as messages",
     );
     expect(own.rows[0]!.messages.map((m) => m.body)).toEqual(["Alice message"]);
+  });
+
+  it("denies anonymous and unverified conversation access and isolates AI replies", async () => {
+    await login(null, "anon");
+    await expect(db.query("select public.secondself_conversation()")).rejects.toThrow(
+      /permission denied/,
+    );
+    await login(unverified);
+    await expect(db.query("select public.secondself_conversation()")).rejects.toThrow(
+      /Access denied/,
+    );
+    await login(bob);
+    const sent = await db.query<{ id: number }>(
+      "select public.secondself_send_message('Hello Second Claes') as id",
+    );
+    const id = sent.rows[0]!.id;
+    await expect(
+      db.query("select public.secondself_store_reply($1,'Forged AI reply')", [id]),
+    ).rejects.toThrow(/permission denied/);
+    await login(alice);
+    const aliceConversation = await db.query<{ conversation: { body: string }[] }>(
+      "select public.secondself_conversation() as conversation",
+    );
+    expect(aliceConversation.rows[0]!.conversation.some((m) => m.body === "Hello Second Claes"))
+      .toBe(false);
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claims', $1, false)", [
+      JSON.stringify({ role: "service_role" }),
+    ]);
+    await db.exec("set role service_role");
+    await db.query("select public.secondself_store_reply($1,'Hello from Second Claes')", [id]);
+    await login(bob);
+    const bobConversation = await db.query<{ conversation: { role: string; body: string }[] }>(
+      "select public.secondself_conversation() as conversation",
+    );
+    expect(bobConversation.rows[0]!.conversation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "user", body: "Hello Second Claes" }),
+        expect.objectContaining({ role: "assistant", body: "Hello from Second Claes" }),
+      ]),
+    );
+    await login(alice);
+    const privateConversation = await db.query<{ conversation: { body: string }[] }>(
+      "select public.secondself_conversation() as conversation",
+    );
+    expect(privateConversation.rows[0]!.conversation.some((m) => m.body === "Hello from Second Claes"))
+      .toBe(false);
   });
 
   it("requires a live session and current verification", async () => {
