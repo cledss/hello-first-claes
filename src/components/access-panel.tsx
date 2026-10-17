@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAuthClient } from "@/lib/auth";
 import type { ConversationMessage } from "@/lib/second-claes";
+import { PRE_MCP_TEMPLATES, preMcpResponse } from "@/lib/pre-mcp";
 
 type OwnerMessage = { message_id: number; queued_at: string; body: string; email: string };
 
@@ -13,6 +14,7 @@ export function AccessPanel() {
   const [isOwner, setIsOwner] = useState(false);
   const [inbox, setInbox] = useState<OwnerMessage[]>([]);
   const [body, setBody] = useState("");
+  const [templateReply, setTemplateReply] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const configured = Boolean(
@@ -173,10 +175,43 @@ export function AccessPanel() {
               </li>
             ))}
           </ul>
+          <div className="space-y-2">
+            <p className="text-sm">Du kan fråga mig vem jag är eller lämna ett meddelande.</p>
+            <div className="flex flex-wrap gap-2">
+              {PRE_MCP_TEMPLATES.map((template) => (
+                <button
+                  key={template.intent}
+                  type="button"
+                  disabled={busy}
+                  className="rounded-md border px-3 py-2 text-sm"
+                  onClick={() => {
+                    const response = preMcpResponse(template.question);
+                    if (response) {
+                      setTemplateReply(response.reply);
+                      setStatus("");
+                    }
+                  }}
+                >
+                  {template.question}
+                </button>
+              ))}
+            </div>
+            {templateReply && (
+              <p role="note" className="rounded-md border p-3">
+                <strong>Second Claes:</strong> {templateReply}
+              </p>
+            )}
+          </div>
           <form
             onSubmit={(event) => {
               event.preventDefault();
               void run(async () => {
+                const template = preMcpResponse(body);
+                if (template) {
+                  setTemplateReply(template.reply);
+                  setBody("");
+                  return;
+                }
                 const client = getAuthClient();
                 if (!client) throw new Error("Authentication unavailable");
                 const { data: receipt, error: sendError } = await client.rpc(
@@ -185,13 +220,14 @@ export function AccessPanel() {
                 );
                 if (sendError) throw sendError;
                 setBody("");
+                setTemplateReply(null);
                 await load();
                 setStatus(`Meddelandet är mottaget. Köplats: ${receipt.queue_position}.`);
               });
             }}
           >
             <label>
-              Your message
+              Fråga eller meddelande till First Claes
               <textarea
                 required
                 maxLength={4000}
@@ -201,7 +237,7 @@ export function AccessPanel() {
               />
             </label>
             <button disabled={busy || !body.trim()} className={buttonClass}>
-              Lämna meddelande
+              Skicka
             </button>
           </form>
           {isOwner && (
