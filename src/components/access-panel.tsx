@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAuthClient } from "@/lib/auth";
-import { replyAsSecondClaes } from "@/lib/reply.server";
 import type { ConversationMessage } from "@/lib/second-claes";
+
+type OwnerMessage = { message_id: number; queued_at: string; body: string; email: string };
 
 export function AccessPanel() {
   const [name, setName] = useState("");
@@ -9,6 +10,8 @@ export function AccessPanel() {
   const [sent, setSent] = useState(false);
   const [level, setLevel] = useState<number | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [inbox, setInbox] = useState<OwnerMessage[]>([]);
   const [body, setBody] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,6 +46,15 @@ export function AccessPanel() {
     if (result.error) throw result.error;
     setLevel(access.data.level);
     setMessages(result.data);
+    const owner = access.data.is_owner === true;
+    setIsOwner(owner);
+    if (owner) {
+      const pending = await client.rpc("secondself_owner_inbox");
+      if (pending.error) throw pending.error;
+      setInbox(pending.data);
+    } else {
+      setInbox([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -135,7 +147,8 @@ export function AccessPanel() {
         <section className="space-y-4" aria-label="Your SecondSelf access">
           <p>Level {level} access · Second Claes</p>
           <p className="text-sm">
-            Conversations are private to your account. Privileged access requires owner approval.
+            Hej! Jag är Second Claes, assistent till First Claes. Lämna ett meddelande så
+            lägger jag det i kön för First Claes. Jag är en digital telefonsvarare.
           </p>
           <ul>
             {messages.map((message) => (
@@ -145,6 +158,11 @@ export function AccessPanel() {
               >
                 <strong>{message.role === "assistant" ? "Second Claes" : "You"}:</strong>{" "}
                 {message.body}
+                {message.role === "user" && message.queue_status && (
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    ({message.queue_status === "pending" ? "I kö" : "Hanterat"})
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -152,11 +170,16 @@ export function AccessPanel() {
             onSubmit={(event) => {
               event.preventDefault();
               void run(async () => {
-                const { data, error } = await getAuthClient()!.auth.getSession();
-                if (error || !data.session?.access_token) throw new Error("Sign in again");
-                await replyAsSecondClaes({ data: { token: data.session.access_token, body } });
+                const client = getAuthClient();
+                if (!client) throw new Error("Authentication unavailable");
+                const { data: receipt, error: sendError } = await client.rpc(
+                  "secondself_voicemail",
+                  { message_body: body },
+                );
+                if (sendError) throw sendError;
                 setBody("");
                 await load();
+                setStatus(`Meddelandet är mottaget. Köplats: ${receipt.queue_position}.`);
               });
             }}
           >
@@ -171,9 +194,40 @@ export function AccessPanel() {
               />
             </label>
             <button disabled={busy || !body.trim()} className={buttonClass}>
-              Send to Second Claes
+              Lämna meddelande
             </button>
           </form>
+          {isOwner && (
+            <section aria-label="First Claes inbox" className="space-y-2">
+              <h3 className="font-semibold">Meddelanden till First Claes ({inbox.length})</h3>
+              <ul>
+                {inbox.map((item) => (
+                  <li key={item.message_id} className="border-b py-2">
+                    <p className="text-sm">{item.email}</p>
+                    <p className="whitespace-pre-wrap">{item.body}</p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={buttonClass}
+                      onClick={() =>
+                        void run(async () => {
+                          const { error } = await getAuthClient()!.rpc(
+                            "secondself_mark_handled",
+                            { message_id: item.message_id },
+                          );
+                          if (error) throw error;
+                          await load();
+                          setStatus("Meddelandet markerat som hanterat.");
+                        })
+                      }
+                    >
+                      Markera hanterat
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <button
             disabled={busy}
             className={buttonClass}
@@ -199,6 +253,8 @@ export function AccessPanel() {
               void run(async () => {
                 const { error } = await getAuthClient()!.auth.signOut();
                 setLevel(null);
+                setIsOwner(false);
+                setInbox([]);
                 setMessages([]);
                 setSent(false);
                 if (error) throw error;
