@@ -37,4 +37,10 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  // Lovable Cloud generates these integration files with its own formatting.
+  // Keep semantic lint and type checks, but do not enforce project formatting there.
+  {
+    files: ["src/integrations/supabase/**/*.{ts,tsx}"],
+    rules: { "prettier/prettier": "off", "prefer-const": "off" },
+  },
 );
