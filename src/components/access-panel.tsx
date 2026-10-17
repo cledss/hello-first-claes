@@ -140,7 +140,10 @@ export function AccessPanel() {
           </p>
           <ul>
             {messages.map((message) => (
-              <li key={`${message.role}-${message.id}`} className="whitespace-pre-wrap border-b py-2">
+              <li
+                key={`${message.role}-${message.id}`}
+                className="whitespace-pre-wrap border-b py-2"
+              >
                 <strong>{message.role === "assistant" ? "Second Claes" : "You"}:</strong>{" "}
                 {message.body}
               </li>
