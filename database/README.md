@@ -2,30 +2,32 @@
 
 ## Provider and hosting decision
 
-Supabase Auth supplies real email OTP registration/login and immutable `auth.users.id`.
+Supabase Auth supplies real email magic-link registration/login and immutable `auth.users.id`.
 Postgres functions enforce SecondSelf grants at the Data API boundary. This works with
 TanStack Start's Cloudflare Workers target using the browser SDK and HTTPS; no Node-only
 auth server, Worker database binding, service key, or hosting-specific auth plugin is needed.
-Email OTP avoids redirect/session cookies and works across mobile email clients. Phone
+Email magic links use the default Lovable email template and return to the application origin. The browser SDK processes the callback; no session cookies are required. Phone
 verification is intentionally unavailable until an SMS provider is configured. The public
 E.164 number is never an authorization input.
 
 ## Manual setup before an approved deployment
 
-1. Create/select a dedicated Supabase project. As database administrator, apply
-   `database/schema.sql` once in a transaction. This is the initial migration; do not rerun
-   over an existing installation. Keep `secondself` OUT of Data API exposed schemas; expose
+1. Use the existing Lovable Cloud Supabase project. The initial `database/schema.sql` migration
+   was applied to the Lovable database on 2026-10-17 and verified to have five RLS-enabled
+   tables, seven authenticated-only public RPCs and the verification trigger. Do not rerun
+   the initial migration over that installation. Keep `secondself` OUT of Data API exposed schemas; expose
    `public` only. The schema enables RLS and denies direct table access even if accidentally
    exposed. Public RPC wrappers run as invoker and call narrowly granted private functions.
-2. Enable Email Auth, new-user registration and **Confirm email**. Disable anonymous,
-   phone and other providers for this release. Configure production SMTP, sender identity,
-   OTP expiry/rate limits and abuse controls. Set the Magic Link email template to display
-   `{{ .Token }}` as a one-time code (rather than requiring a magic-link redirect). Keep
-   production Site URL and allowed redirects restricted to approved application origins.
-3. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in hosting build
-   environment settings. Both are public configuration, not credentials. No service-role
-   or secret key belongs in this app. Rebuild only after deployment approval. Without these
-   values the landing page stays public and sign-in is disabled with an explanation.
+2. Email Auth has been enabled in Lovable Cloud. Keep new-user registration and **Confirm email**
+   enabled; disable anonymous, phone and other providers unless deliberately required. The
+   default Magic Link email template sends a clickable link; no custom OTP template is needed.
+   Allowlist the approved preview/production origins for Auth redirects, and set the Site URL
+   correctly before a live test. Configure provider-side email rate limits, abuse controls,
+   sender reputation and SMTP as needed before public rollout.
+3. Lovable Cloud already supplies `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+   in its managed build environment. Both are public configuration, not credentials; do not
+   add a service-role or secret key to the browser. Rebuild only after deployment approval.
+   Without these values the landing page stays public and sign-in is disabled.
 4. First Claes registers using his own verified email. An administrator independently checks
    the account identity and copies its UUID from Auth users. In an administrator SQL session,
    execute the following with that UUID substituted (never a phone/email match):
@@ -42,8 +44,9 @@ E.164 number is never an authorization input.
 
    Verify exactly one owner exists. No public bootstrap endpoint exists. Owner replacement
    is a separate audited administrator operation. Protect the dashboard/admin account with MFA.
-5. Verify an actual email arrives, an incorrect/expired code fails, and a correct code signs
-   in with Level 1. Save a message, sign out, sign in again, and confirm it persists. Use a
+5. Verify an actual magic-link email arrives, expired/invalid links fail, and a valid link
+   returns to the approved app origin with Level 1. Save a message, sign out, sign in again,
+   and confirm it persists. Use a
    second verified account to confirm isolation. Request Level 2; it remains pending.
 6. A signed-in owner can explicitly approve a pending request using the authenticated SDK:
    `client.rpc('secondself_approve', { subject: '<user-uuid>', approved_level: 2 })`.
@@ -73,7 +76,7 @@ E.164 number is never an authorization input.
   changes. The audit table is append-only for app users; database administrators can manage it.
 - Supabase Auth's session schema is an external dependency. The local SQL tests represent
   the documented `auth.users`, `auth.sessions`, `auth.uid()` and `auth.jwt()` contract, not
-  the actual mail gateway/JWT verifier. The SMTP/mobile sign-in smoke test and Supabase
+  the actual mail gateway/JWT verifier. The live-email/mobile magic-link smoke test and Supabase
   security advisors must be run against the configured staging project before deployment.
 
 ## Verification
