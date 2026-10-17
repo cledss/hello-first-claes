@@ -66,11 +66,20 @@ describe("email access flow", () => {
     let refreshed = false;
     client.rpc.mockImplementation(async (name: string) => ({
       error: null,
-      data: name === "secondself_access" ? { level: 1 } :
-        refreshed ? [
-          { id: 1, role: "user", body: "Hello Second Claes", created_at: "2026-10-17" },
-          { id: 2, role: "assistant", body: "Hello! How can I help?", created_at: "2026-10-17" },
-        ] : [],
+      data:
+        name === "secondself_access"
+          ? { level: 1 }
+          : refreshed
+            ? [
+                { id: 1, role: "user", body: "Hello Second Claes", created_at: "2026-10-17" },
+                {
+                  id: 2,
+                  role: "assistant",
+                  body: "Hello! How can I help?",
+                  created_at: "2026-10-17",
+                },
+              ]
+            : [],
     }));
     reply.mockImplementation(async () => {
       refreshed = true;
