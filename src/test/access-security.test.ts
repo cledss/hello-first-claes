@@ -167,9 +167,10 @@ describe.sequential("SecondSelf database authorization", () => {
     const aliceConversation = await db.query<{ conversation: { body: string }[] }>(
       "select public.secondself_conversation() as conversation",
     );
-    expect(
-      aliceConversation.rows[0]!.conversation.some((m) => m.body === "Please call me"),
-    ).toBe(false);
+    const canReadBob = aliceConversation.rows[0]!.conversation.some(
+      (m) => m.body === "Please call me",
+    );
+    expect(canReadBob).toBe(false);
     await login(owner);
     const inbox = await db.query<{ inbox: { message_id: number; body: string }[] }>(
       "select public.secondself_owner_inbox() as inbox",
