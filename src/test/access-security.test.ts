@@ -107,7 +107,7 @@ describe.sequential("SecondSelf database authorization", () => {
 
   it("isolates messages and refuses client-supplied ownership", async () => {
     await login(alice);
-    await db.query("select public.secondself_send('Alice message')");
+    await db.query("select public.secondself_voicemail('Alice message')");
     await expect(
       db.query("insert into secondself.messages(user_id,body) values ($1,'attack')", [bob]),
     ).rejects.toThrow(/permission denied/);
@@ -116,7 +116,7 @@ describe.sequential("SecondSelf database authorization", () => {
       "select public.secondself_messages() as messages",
     );
     expect(empty.rows[0]!.messages).toEqual([]);
-    await db.query("select public.secondself_send('Bob message')");
+    await db.query("select public.secondself_voicemail('Bob message')");
     await login(alice);
     const own = await db.query<{ messages: { body: string }[] }>(
       "select public.secondself_messages() as messages",
@@ -228,7 +228,7 @@ describe.sequential("SecondSelf database authorization", () => {
     await db.query("select public.secondself_revoke($1)", [alice]);
     await login(alice);
     await expect(db.query("select public.secondself_messages()")).rejects.toThrow(/Access denied/);
-    await expect(db.query("select public.secondself_send('after revocation')")).rejects.toThrow(
+    await expect(db.query("select public.secondself_voicemail('after revocation')")).rejects.toThrow(
       /Access denied/,
     );
     await db.exec("reset role");
