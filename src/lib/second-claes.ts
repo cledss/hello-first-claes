@@ -8,13 +8,13 @@ export type ConversationMessage = {
 export function validateReplyInput(value: unknown): { token: string; body: string } {
   if (!value || typeof value !== "object") throw new Error("Invalid request");
   const data = value as Record<string, unknown>;
-  if (typeof data.token !== "string" || data.token.length < 20 || data.token.length > 10000) {
+  if (typeof data["token"] !== "string" || data["token"].length < 20 || data["token"].length > 10000) {
     throw new Error("Authentication required");
   }
-  if (typeof data.body !== "string" || !data.body.trim() || data.body.trim().length > 4000) {
+  if (typeof data["body"] !== "string" || !data["body"].trim() || data["body"].trim().length > 4000) {
     throw new Error("Message must contain 1–4000 characters");
   }
-  return { token: data.token, body: data.body.trim() };
+  return { token: data["token"], body: data["body"].trim() };
 }
 
 export function toModelMessages(history: ConversationMessage[]) {
