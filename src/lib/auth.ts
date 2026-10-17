@@ -9,7 +9,7 @@ export function getAuthClient() {
   // Browser-only session state; no shared SSR client or session.
   if (typeof window === "undefined") return null;
   client ??= createClient(url, key, {
-    auth: { persistSession: false, detectSessionInUrl: false, autoRefreshToken: true },
+    auth: { persistSession: false, detectSessionInUrl: true, autoRefreshToken: true },
   });
   return client;
 }
