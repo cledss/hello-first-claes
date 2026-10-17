@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAuthClient } from "@/lib/auth";
-
-type Message = { id: number; body: string; created_at: string };
+import { replyAsSecondClaes } from "@/lib/reply.server";
+import type { ConversationMessage } from "@/lib/second-claes";
 
 export function AccessPanel() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [level, setLevel] = useState<number | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [body, setBody] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +39,7 @@ export function AccessPanel() {
       setMessages([]);
       throw access.error;
     }
-    const result = await client.rpc("secondself_messages");
+    const result = await client.rpc("secondself_conversation");
     if (result.error) throw result.error;
     setLevel(access.data.level);
     setMessages(result.data);
@@ -135,12 +135,13 @@ export function AccessPanel() {
         <section className="space-y-4" aria-label="Your SecondSelf access">
           <p>Level {level} access · Second Claes</p>
           <p className="text-sm">
-            Public capabilities: introductions and access requests. Your messages are private to
-            your account. Automated replies are not available yet.
+            Public capabilities: introductions and conversation. Your messages and Second Claes\u0027s
+            replies are private to your account. Privileged information requires First Claes\u0027s approval.
           </p>
           <ul>
             {messages.map((message) => (
-              <li key={message.id} className="whitespace-pre-wrap border-b py-2">
+              <li key={`${message.role}-${message.id}`} className="whitespace-pre-wrap border-b py-2">
+                <strong>{message.role === "assistant" ? "Second Claes" : "You"}:</strong>{" "}
                 {message.body}
               </li>
             ))}
@@ -149,11 +150,11 @@ export function AccessPanel() {
             onSubmit={(event) => {
               event.preventDefault();
               void run(async () => {
-                const { error } = await getAuthClient()!.rpc("secondself_send", { body });
-                if (error) throw error;
+                const { data, error } = await getAuthClient()!.auth.getSession();
+                if (error || !data.session?.access_token) throw new Error("Sign in again");
+                await replyAsSecondClaes({ data: { token: data.session.access_token, body } });
                 setBody("");
                 await load();
-                setStatus("Message saved. Automated replies are not available yet.");
               });
             }}
           >
@@ -168,7 +169,7 @@ export function AccessPanel() {
               />
             </label>
             <button disabled={busy || !body.trim()} className={buttonClass}>
-              Save message
+              Send to Second Claes
             </button>
           </form>
           <button
