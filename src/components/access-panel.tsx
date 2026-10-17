@@ -4,6 +4,7 @@ import { getAuthClient } from "@/lib/auth";
 type Message = { id: number; body: string; created_at: string };
 
 export function AccessPanel() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -64,7 +65,10 @@ export function AccessPanel() {
                 if (error) throw error;
                 await load();
               } else {
-                const { error } = await client.auth.signInWithOtp({ email });
+                const { error } = await client.auth.signInWithOtp({
+                  email: email.trim(),
+                  options: { data: { full_name: name.trim() } },
+                });
                 if (error) throw error;
                 setSent(true);
                 setStatus("Check your email for a one-time code.");
@@ -72,6 +76,21 @@ export function AccessPanel() {
             });
           }}
         >
+          {!sent && (
+            <label className="block text-sm">
+              Name
+              <input
+                type="text"
+                required
+                maxLength={120}
+                autoComplete="name"
+                value={name}
+                disabled={busy}
+                onChange={(event) => setName(event.target.value)}
+                className={inputClass}
+              />
+            </label>
+          )}
           <label className="block text-sm">
             Email
             <input
