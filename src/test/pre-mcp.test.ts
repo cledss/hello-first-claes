@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { PRE_MCP_TEMPLATES, preMcpResponse } from "@/lib/pre-mcp";
 
 describe("pre-MCP text templates", () => {
-  it.each(PRE_MCP_TEMPLATES)("answers $question without AI or a database write", ({ intent, question }) => {
-    expect(preMcpResponse(question)?.intent).toBe(intent);
-    expect(preMcpResponse(question)?.reply.length).toBeGreaterThan(30);
+  it("answers all four templates without AI or database writes", () => {
+    for (const { intent, question } of PRE_MCP_TEMPLATES) {
+      expect(preMcpResponse(question)?.intent).toBe(intent);
+      expect(preMcpResponse(question)?.reply.length).toBeGreaterThan(30);
+    }
   });
 
   it("accepts Swedish variants and case/whitespace/punctuation", () => {
