@@ -40,7 +40,10 @@ describe("email access flow", () => {
   });
 
   it("loads server-authorized Level 1 after the magic-link callback", async () => {
-    client.auth.getSession.mockResolvedValue({ data: { session: { access_token: "test" } }, error: null });
+    client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "test" } },
+      error: null,
+    });
     client.rpc.mockImplementation(async (name: string) => ({
       error: null,
       data: name === "secondself_access" ? { level: 1 } : [],
@@ -54,11 +57,16 @@ describe("email access flow", () => {
   });
 
   it("does not grant access when the server denies the session", async () => {
-    client.auth.getSession.mockResolvedValue({ data: { session: { access_token: "test" } }, error: null });
+    client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "test" } },
+      error: null,
+    });
     client.rpc.mockResolvedValue({ data: null, error: new Error("Access denied") });
     render(<AccessPanel />);
     await screen.findByText("Sign-in succeeded, but access could not be loaded.");
-    expect(screen.queryByRole("region", { name: "Your SecondSelf access" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Your SecondSelf access" }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not claim success when the provider fails", async () => {
