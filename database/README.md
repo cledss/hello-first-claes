@@ -68,8 +68,9 @@ E.164 number is never an authorization input.
 - Credentials/sessions stay in memory, with automatic refresh only while the page is open.
   Reloading requires email sign-in again. No cookie authentication is introduced; the existing
   TanStack CSRF middleware is unchanged. Prevent XSS; bearer tokens are accessible to browser JS.
-- This PR stores the user's own messages and shows public capabilities. It does not generate
-  Second Claes replies, expose private memories/contacts, or implement MCP/negotiation.
+- This PR stores the user's own messages and shows public capabilities. The conversation feature adds AI replies only after the separate reply migration and
+  server credentials are configured. It does not expose private memories/contacts or
+  implement MCP/negotiation.
   Messages are limited to 4,000 characters and the latest 100 are returned. Configure
   provider-side rate limits/quotas and a retention policy before public availability.
 - Database admins remain trusted. Restrict administrative credentials and record operational
@@ -93,3 +94,25 @@ Docs consulted: [email OTP](https://supabase.com/docs/guides/auth/auth-email-pas
 [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [sessions](https://supabase.com/docs/guides/auth/sessions). Changelog checked 2026-10-17;
 the upcoming TLS cipher removal does not affect modern browser HTTPS clients.
+
+## Second Claes reply deployment (new feature, not yet activated)
+
+1. Review and apply `database/migrations/20261017_second_claes_replies.sql` using
+   Lovable's database administrator tooling. It creates private assistant reply storage,
+   an authenticated conversation reader and message sender, and a service-role-only
+   reply writer. **Do not apply it before approval.**
+2. Configure server-only `OPENAI_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in the
+   hosting runtime, plus `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` (or their
+   existing `VITE_` equivalents). Never use `VITE_` for the two secret keys.
+   Confirm the TanStack Start server runtime can read these at request time.
+3. Configure API spending caps, request monitoring and a retention policy. The new
+   message endpoint enforces verified Level 1 at the database, allows at most five
+   new messages per user per minute, and sends at most twenty recent turns to the model.
+   It uses OpenAI `gpt-4.1-mini` and a 25-second upstream timeout.
+4. After approval, test with two verified accounts: replies arrive, each user sees
+   only their own conversation, Level 0 and revoked sessions are rejected, failed
+   upstream requests never claim success, and API credentials are absent from
+   client assets. Check runtime compatibility and provider billing before publishing.
+5. If the AI request fails after the user message is saved, the message remains
+   in history without an assistant reply. This is intentional for auditability;
+   automatic retries are not enabled to avoid duplicate messages or charges.
