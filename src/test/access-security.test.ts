@@ -145,7 +145,10 @@ describe.sequential("SecondSelf database authorization", () => {
     expect(bobConversation.rows[0]!.conversation).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ role: "user", body: "Please call me", queue_status: "pending" }),
-        expect.objectContaining({ role: "assistant", body: expect.stringContaining("First Claes") }),
+        expect.objectContaining({
+          role: "assistant",
+          body: expect.stringContaining("First Claes"),
+        }),
       ]),
     );
     await expect(
@@ -164,14 +167,17 @@ describe.sequential("SecondSelf database authorization", () => {
     const aliceConversation = await db.query<{ conversation: { body: string }[] }>(
       "select public.secondself_conversation() as conversation",
     );
-    expect(aliceConversation.rows[0]!.conversation.some((m) => m.body === "Please call me"))
-      .toBe(false);
+    expect(
+      aliceConversation.rows[0]!.conversation.some((m) => m.body === "Please call me"),
+    ).toBe(false);
     await login(owner);
     const inbox = await db.query<{ inbox: { message_id: number; body: string }[] }>(
       "select public.secondself_owner_inbox() as inbox",
     );
     expect(inbox.rows[0]!.inbox).toEqual(
-      expect.arrayContaining([expect.objectContaining({ message_id: messageId, body: "Please call me" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ message_id: messageId, body: "Please call me" }),
+      ]),
     );
     await db.query("select public.secondself_mark_handled($1)", [messageId]);
     const after = await db.query<{ inbox: { message_id: number }[] }>(
@@ -183,7 +189,9 @@ describe.sequential("SecondSelf database authorization", () => {
       "select public.secondself_conversation() as conversation",
     );
     expect(handled.rows[0]!.conversation).toEqual(
-      expect.arrayContaining([expect.objectContaining({ body: "Please call me", queue_status: "handled" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ body: "Please call me", queue_status: "handled" }),
+      ]),
     );
   });
 
