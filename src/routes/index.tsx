@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { AccessPanel } from "@/components/access-panel";
 import portrait from "@/assets/second-claes-portrait.jpg";
 
 export const Route = createFileRoute("/")({
@@ -66,36 +67,7 @@ function Index() {
               receive Level 1; Level 2 and above require approval by First Claes.
             </p>
           </div>
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="space-y-4"
-            aria-describedby="access-note"
-          >
-            <label className="block text-sm">
-              Name
-              <input
-                disabled
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2"
-              />
-            </label>
-            <label className="block text-sm">
-              Email
-              <input
-                type="email"
-                disabled
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2"
-              />
-            </label>
-            <button
-              disabled
-              className="w-full rounded-md bg-primary px-4 py-2 text-primary-foreground opacity-60"
-            >
-              Request access
-            </button>
-            <p id="access-note" className="text-sm text-muted-foreground">
-              Not yet available. Login and access requests are not active yet.
-            </p>
-          </form>
+          <AccessPanel />
         </div>
       </section>
 

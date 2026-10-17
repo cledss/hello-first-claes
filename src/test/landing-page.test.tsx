@@ -29,7 +29,7 @@ describe("Landing page", () => {
     expect(img.getAttribute("src")).toContain("second-claes-portrait");
   });
 
-  it("keeps the access request form inert until real auth exists", () => {
+  it("disables sign-in when provider configuration is missing", () => {
     render(<Index />);
 
     expect(screen.getByRole("button", { name: "Request access" })).toBeDisabled();
