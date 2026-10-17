@@ -47,6 +47,7 @@ beforeAll(async () => {
     console.error("Migration SQL error near:", migration.slice(position - 90, position + 90));
     throw error;
   }
+  await db.exec(readFileSync("database/migrations/20261017_voicemail_queue.sql", "utf8"));
   for (const [id, verified] of [
     [alice, true],
     [bob, true],
@@ -123,53 +124,76 @@ describe.sequential("SecondSelf database authorization", () => {
     expect(own.rows[0]!.messages.map((m) => m.body)).toEqual(["Alice message"]);
   });
 
-  it("denies anonymous and unverified conversation access and isolates AI replies", async () => {
+  it("queues a message and receipt atomically and isolates each visitor", async () => {
     await login(null, "anon");
-    await expect(db.query("select public.secondself_conversation()")).rejects.toThrow(
+    await expect(db.query("select public.secondself_voicemail('Hello')")).rejects.toThrow(
       /permission denied/,
     );
     await login(unverified);
-    await expect(db.query("select public.secondself_conversation()")).rejects.toThrow(
+    await expect(db.query("select public.secondself_voicemail('Hello')")).rejects.toThrow(
       /Access denied/,
     );
     await login(bob);
-    const sent = await db.query<{ id: number }>(
-      "select public.secondself_send_message('Hello Second Claes') as id",
+    const sent = await db.query<{ receipt: { message_id: number; queue_position: number } }>(
+      "select public.secondself_voicemail('Please call me') as receipt",
     );
-    const id = sent.rows[0]!.id;
+    expect(sent.rows[0]!.receipt.queue_position).toBeGreaterThan(0);
+    const messageId = sent.rows[0]!.receipt.message_id;
+    const bobConversation = await db.query<{
+      conversation: { role: string; body: string; queue_status: string | null }[];
+    }>("select public.secondself_conversation() as conversation");
+    expect(bobConversation.rows[0]!.conversation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "user", body: "Please call me", queue_status: "pending" }),
+        expect.objectContaining({ role: "assistant", body: expect.stringContaining("First Claes") }),
+      ]),
+    );
     await expect(
-      db.query("select public.secondself_store_reply($1,'Forged AI reply')", [id]),
-    ).rejects.toThrow(/permission denied/);
+      db.query("select public.secondself_mark_handled($1)", [messageId]),
+    ).rejects.toThrow(/Owner approval required/);
+    await expect(db.query("select public.secondself_owner_inbox()")).rejects.toThrow(
+      /Owner approval required/,
+    );
+    await expect(db.query("select public.secondself_send('bypass')")).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(db.query("select public.secondself_send_message('bypass')")).rejects.toThrow(
+      /permission denied/,
+    );
     await login(alice);
     const aliceConversation = await db.query<{ conversation: { body: string }[] }>(
       "select public.secondself_conversation() as conversation",
     );
-    expect(
-      aliceConversation.rows[0]!.conversation.some((m) => m.body === "Hello Second Claes"),
-    ).toBe(false);
-    await db.exec("reset role");
-    await db.query("select set_config('request.jwt.claims', $1, false)", [
-      JSON.stringify({ role: "service_role" }),
-    ]);
-    await db.exec("set role service_role");
-    await db.query("select public.secondself_store_reply($1,'Hello from Second Claes')", [id]);
+    expect(aliceConversation.rows[0]!.conversation.some((m) => m.body === "Please call me"))
+      .toBe(false);
+    await login(owner);
+    const inbox = await db.query<{ inbox: { message_id: number; body: string }[] }>(
+      "select public.secondself_owner_inbox() as inbox",
+    );
+    expect(inbox.rows[0]!.inbox).toEqual(
+      expect.arrayContaining([expect.objectContaining({ message_id: messageId, body: "Please call me" })]),
+    );
+    await db.query("select public.secondself_mark_handled($1)", [messageId]);
+    const after = await db.query<{ inbox: { message_id: number }[] }>(
+      "select public.secondself_owner_inbox() as inbox",
+    );
+    expect(after.rows[0]!.inbox.some((m) => m.message_id === messageId)).toBe(false);
     await login(bob);
-    const bobConversation = await db.query<{ conversation: { role: string; body: string }[] }>(
+    const handled = await db.query<{ conversation: { body: string; queue_status: string }[] }>(
       "select public.secondself_conversation() as conversation",
     );
-    expect(bobConversation.rows[0]!.conversation).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ role: "user", body: "Hello Second Claes" }),
-        expect.objectContaining({ role: "assistant", body: "Hello from Second Claes" }),
-      ]),
+    expect(handled.rows[0]!.conversation).toEqual(
+      expect.arrayContaining([expect.objectContaining({ body: "Please call me", queue_status: "handled" })]),
     );
+  });
+
+  it("enforces a per-person rate limit inside the database", async () => {
     await login(alice);
-    const privateConversation = await db.query<{ conversation: { body: string }[] }>(
-      "select public.secondself_conversation() as conversation",
+    await db.query("select public.secondself_voicemail('Second')");
+    await db.query("select public.secondself_voicemail('Third')");
+    await expect(db.query("select public.secondself_voicemail('Fourth')")).rejects.toThrow(
+      /Rate limit/,
     );
-    expect(
-      privateConversation.rows[0]!.conversation.some((m) => m.body === "Hello from Second Claes"),
-    ).toBe(false);
   });
 
   it("requires a live session and current verification", async () => {
