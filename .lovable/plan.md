@@ -1,36 +1,33 @@
-# Read-only inspection: auth and environment for PR #4
+# Inspection: server secrets and runtime for the Second Claes reply function
 
-Nothing was changed. These are the findings from read-only checks, plus what is still unconfirmed.
+Read-only. Nothing was changed. No secret values were read or shown.
 
-## Confirmed
+## Secret names
 
-- **Backend:** Lovable Cloud is running and not paused. Preview and the published app use the same instance.
-- **Build environment:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and `VITE_SUPABASE_PROJECT_ID` are set with non-empty values. Server-side `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_PROJECT_ID` are set too. The publishable key is in the opaque `sb_publishable_...` format, not a JWT.
-- **Database:** the `secondself` schema exists and has 5 tables. `public` has 2 tables.
-- **Email domain:** none configured. Auth emails use the default Lovable sender and the default templates.
-- **Custom auth email templates:** none in the repo, so there is no auth email webhook route and no template files.
-
-## Not confirmed (no read access from here)
-
-- **Email sign-in on or off:** I have no tool that reads this setting. It is off by default on new Cloud projects. The only tool that changes it turns it on, so I did not call it.
-- **OTP code in the email (`{{ .Token }}`):** not confirmed, and probably not set up. With no custom templates, the default Magic link / Confirm signup emails send a link, not a 6-digit code. To put the code in the email you need custom auth templates that render the token.
-- **OTP length and expiry, auto-confirm, sign-up enabled, HIBP:** I can't read these. You can check them under More -> Users -> Auth settings -> Email.
-
-## What I can and cannot manage
-
-| Setting | Who can change it |
+| Name | Status |
 |---|---|
-| Turn on email sign-in | Me (enable email auth tool) |
-| Sign-up on/off, auto-confirm, HIBP, require current password, auth email rate limit | Me (configure auth tool), but each call writes all of these at once, so I need their current values first |
-| Social providers (Google, Lovable, etc.) | Me |
-| Custom auth email templates that show the OTP code | Me, through the auth template scaffold. It needs an email domain and adds files, which would land on `main` |
-| Email domain setup | You, through the setup dialog |
-| OTP length (4-8) and expiry | You only: Auth settings -> Email -> One-time codes |
-| Minimum password length, secure email change | You only |
-| VITE_* values | Generated automatically. Do not edit them |
+| OPENAI_API_KEY | Absent. Not in project secrets. |
+| SUPABASE_SERVICE_ROLE_KEY | Not listed as a project secret. Lovable Cloud injects it into the server runtime automatically (the generated admin client depends on it). It cannot be viewed, copied or set by anyone. |
+| SUPABASE_URL | Provided automatically by Lovable Cloud to the server runtime. |
+| SUPABASE_PUBLISHABLE_KEY | Provided automatically by Lovable Cloud to the server runtime. |
+| LOVABLE_API_KEY | Present (managed). Gives access to Lovable AI. |
 
-## Suggested next steps (only after you approve)
+As merged, the reply function stops with "Second Claes replies are not configured yet" because OPENAI_API_KEY is missing.
 
-1. You check the Email and One-time codes settings in Auth settings and share the values.
-2. If PR #4 depends on a code in the email: set up an email domain, then scaffold the auth templates on a separate PR branch, not in Lovable, so `main` stays unchanged.
-3. Turn on email sign-in only when you approve. It is a hosted setting, so it changes no files on `main`, but it is live for both preview and production right away.
+## Server-function runtime
+
+Supported. Published hosting runs TanStack Start server functions on Cloudflare Workers (edge runtime). Plain `fetch`, `AbortSignal.timeout` and the Supabase JS client work there. Secrets must be read inside the handler, which the function already does.
+
+## Can Lovable AI replace OpenAI?
+
+Yes. No paid OpenAI key is needed. Lovable AI uses the existing LOVABLE_API_KEY and bills usage to the workspace. There is a free monthly allowance, then usage-based credits. Models include Google Gemini and OpenAI GPT-5 family.
+
+## Safe next steps (for Codex, via a GitHub PR)
+
+1. In the reply server function, swap the OpenAI call for a Lovable AI Gateway call (the `@lovable.dev/ai-gateway` SDK, or the OpenAI-compatible chat endpoint) using `process.env.LOVABLE_API_KEY`, read inside the handler. Suggested model: `google/gemini-3-flash-preview` (cheap and fast).
+2. Remove the OPENAI_API_KEY requirement. Keep the server-side checks for verified session and Level 1.
+3. Handle rate-limit (429) and out-of-credits (402) responses with a clear error and no fake success.
+4. Keep using the injected service role key only inside the handler. Never expose it to the browser.
+5. Apply the reply migration only after approval, then publish and test with two verified accounts.
+
+To keep OpenAI instead: First Claes adds OPENAI_API_KEY in Project Settings -> Secrets, then publishes.
