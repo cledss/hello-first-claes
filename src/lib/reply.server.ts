@@ -11,7 +11,8 @@ export const replyAsSecondClaes = createServerFn({ method: "POST" })
   .inputValidator(validateReplyInput)
   .handler(async ({ data }) => {
     const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
-    const publishable = process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+    const publishable =
+      process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
     const serviceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
     const apiKey = process.env["OPENAI_API_KEY"];
     if (!url || !publishable || !serviceKey || !apiKey) {
@@ -39,7 +40,9 @@ export const replyAsSecondClaes = createServerFn({ method: "POST" })
       throw new Error("Message could not be saved");
     }
 
-    const { data: conversation, error: conversationError } = await client.rpc("secondself_conversation");
+    const { data: conversation, error: conversationError } = await client.rpc(
+      "secondself_conversation",
+    );
     if (conversationError || !Array.isArray(conversation)) {
       throw new Error("Conversation could not be loaded");
     }
