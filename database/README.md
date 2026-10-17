@@ -136,3 +136,15 @@ Legacy message-sending RPCs are revoked to prevent bypass. The owner inbox requi
 row in `secondself.owner` for First Claes; if no owner is provisioned, messages remain
 queued safely but cannot yet be marked handled through the UI. Provision owner access
 only after independent identity verification; never infer it from a name or email.
+
+## Text pre-MCP (version 0.1)
+
+The authenticated text interface recognizes four explicit, non-generative templates:
+`Who are you?`, `What can you do?`, `How can I reach First Claes?`, and
+`Leave a message`. Common Swedish equivalents are recognized as well.
+The first three return fixed text describing identity, capabilities and contact;
+the last explains how to leave a message. Template questions are answered locally,
+are not added to First Claes's queue and do not consume the voicemail rate limit.
+Other submitted text is treated as a message to First Claes, queued transactionally
+and acknowledged only after a successful database write. This is an initial text
+protocol, not a live MCP endpoint, agent authentication, or general-purpose chatbot.
