@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier -- temporary until formatter pass */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessPanel } from "@/components/access-panel";
