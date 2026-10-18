@@ -126,7 +126,7 @@ describe("email access flow", () => {
 
   it("answers a pre-MCP question in text without queuing a message", async () => {
     client.auth.getSession.mockResolvedValue({
-      data: { session: { access_token: "verified-session-token" } },
+      data: { session: { access_token: "verified-session-token", user: { is_anonymous: false } } },
       error: null,
     });
     client.rpc.mockImplementation(async (name: string) => ({
@@ -148,7 +148,7 @@ describe("email access flow", () => {
 
   it("does not grant access when the server denies the session", async () => {
     client.auth.getSession.mockResolvedValue({
-      data: { session: { access_token: "test" } },
+      data: { session: { access_token: "test", user: { is_anonymous: false } } },
       error: null,
     });
     client.rpc.mockResolvedValue({ data: null, error: new Error("Access denied") });
