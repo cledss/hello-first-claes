@@ -5,7 +5,7 @@ begin;
 -- Server-enforced maximum age for verified magic-link sessions.
 -- Refreshing an access token cannot extend the original session age.
 create or replace function secondself.require_access(required_level integer default 1) returns uuid
-language plpgsql security definer set search_path = '' as $
+language plpgsql security definer set search_path = '' as $$
 declare caller uuid := auth.uid();
 begin
   if caller is null or not exists (
@@ -21,7 +21,7 @@ begin
   ) then raise exception 'Access denied' using errcode = '42501'; end if;
   return caller;
 end;
-$;
+$$;
 revoke all on function secondself.require_access(integer) from public, anon, authenticated;
 
 create function secondself.require_guest() returns uuid
