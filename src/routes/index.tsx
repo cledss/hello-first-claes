@@ -41,9 +41,7 @@ function Index() {
           <p className="mt-3 max-w-md text-base text-muted-foreground">
             Hej! Jag är Second Claes, the digital representative of First Claes.
           </p>
-          <span
-            className="mt-3 inline-block text-base font-medium text-accent-blue hover:underline"
-          >
+          <span className="mt-3 inline-block text-base font-medium text-accent-blue hover:underline">
             +46705121441
           </span>
           <p className="mt-4 font-display text-xl text-primary">How can I help you?</p>
