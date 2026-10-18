@@ -74,7 +74,7 @@ describe("email access flow", () => {
 
   it("loads server-authorized Level 1 after the magic-link callback", async () => {
     client.auth.getSession.mockResolvedValue({
-      data: { session: { access_token: "test" } },
+      data: { session: { access_token: "test", user: { is_anonymous: false } } },
       error: null,
     });
     client.rpc.mockImplementation(async (name: string) => ({
@@ -91,7 +91,7 @@ describe("email access flow", () => {
 
   it("queues a voicemail and displays the stored acknowledgement", async () => {
     client.auth.getSession.mockResolvedValue({
-      data: { session: { access_token: "verified-session-token" } },
+      data: { session: { access_token: "verified-session-token", user: { is_anonymous: false } } },
       error: null,
     });
     let refreshed = false;
