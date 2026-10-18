@@ -5,12 +5,19 @@ import { AccessPanel } from "@/components/access-panel";
 const client = vi.hoisted(() => ({
   auth: {
     signInWithOtp: vi.fn(),
+    signInAnonymously: vi.fn(),
+    onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
     getSession: vi.fn(),
     signOut: vi.fn(),
   },
   rpc: vi.fn(),
 }));
-vi.mock("@/lib/auth", () => ({ getAuthClient: () => client }));
+vi.mock("@/lib/auth", () => ({
+  getAuthClient: () => client,
+  enforceSevenDayLogin: () => client.auth.getSession().then((result: { data: { session: unknown } }) => result.data.session),
+  markVerifiedLogin: vi.fn(),
+  clearVerifiedLogin: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.stubEnv("VITE_SUPABASE_URL", "https://example.invalid");
@@ -21,6 +28,32 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("email access flow", () => {
+  it("creates a temporary account for the first message and shows the persisted receipt", async () => {
+    client.auth.signInAnonymously.mockResolvedValue({ data: { user: { is_anonymous: true } }, error: null });
+    client.rpc.mockImplementation(async (name: string) => ({
+      error: null,
+      data: name === "secondself_guest_voicemail"
+        ? { queue_position: 1, message_id: 17 }
+        : name === "secondself_guest_conversation"
+          ? [
+              { id: 17, role: "user", body: "Hello First Claes", queue_status: "pending" },
+              { id: 18, role: "assistant", body: "Tack för ditt meddelande." },
+            ]
+          : null,
+    }));
+    render(<AccessPanel />);
+    fireEvent.change(screen.getByLabelText("Ditt meddelande till First Claes"), {
+      target: { value: "Hello First Claes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Skicka meddelande" }));
+    await screen.findByText(/Tack för ditt meddelande/);
+    expect(client.auth.signInAnonymously).toHaveBeenCalledOnce();
+    expect(client.rpc).toHaveBeenCalledWith("secondself_guest_voicemail", {
+      message_body: "Hello First Claes",
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Köplats: 1");
+  });
+
   it("sends a provider magic link with the requester's name and current origin", async () => {
     client.auth.signInWithOtp.mockResolvedValue({ error: null });
     render(<AccessPanel />);
@@ -119,7 +152,7 @@ describe("email access flow", () => {
     });
     client.rpc.mockResolvedValue({ data: null, error: new Error("Access denied") });
     render(<AccessPanel />);
-    await screen.findByText("Sign-in succeeded, but access could not be loaded.");
+    await screen.findByText("Inloggningen lyckades men behörigheten kunde inte läsas.");
     expect(
       screen.queryByRole("region", { name: "Your SecondSelf access" }),
     ).not.toBeInTheDocument();
