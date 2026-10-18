@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { getAuthClient } from "@/lib/auth";
+import { clearVerifiedLogin, enforceSevenDayLogin, getAuthClient, markVerifiedLogin } from "@/lib/auth";
 import type { ConversationMessage } from "@/lib/second-claes";
 import { PRE_MCP_TEMPLATES, preMcpResponse } from "@/lib/pre-mcp";
 
 type OwnerMessage = { message_id: number; queued_at: string; body: string; email: string };
 
 export function AccessPanel() {
+  const [guestBody, setGuestBody] = useState("");
+  const [guestMessages, setGuestMessages] = useState<ConversationMessage[]>([]);
+  const [guestReply, setGuestReply] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -30,7 +33,9 @@ export function AccessPanel() {
       await action();
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
-      if (detail.includes("Rate limit")) {
+      if (detail.includes("Temporary account limit")) {
+        setStatus("Tillfälliga konton kan skicka ett meddelande. Logga in för fler.");
+      } else if (detail.includes("Rate limit")) {
         setStatus("För många meddelanden. Försök igen om en stund.");
       } else if (detail.includes("Queue limit") || detail.includes("Queue temporarily full")) {
         setStatus("Kön är full. Försök igen senare.");
@@ -66,25 +71,130 @@ export function AccessPanel() {
     }
   }, []);
 
+  const loadGuest = useCallback(async () => {
+    const client = getAuthClient();
+    if (!client) throw new Error("Authentication unavailable");
+    const { data, error } = await client.rpc("secondself_guest_conversation");
+    if (error) throw error;
+    setGuestMessages(data ?? []);
+  }, []);
+
   useEffect(() => {
     const client = getAuthClient();
     if (!client) return;
     let active = true;
-    // Supabase completes the emailed magic link when the browser returns here.
-    void client.auth.getSession().then(({ data, error }) => {
-      if (!active || error || !data.session) return;
-      void load().catch(() => {
-        if (active) setStatus("Sign-in succeeded, but access could not be loaded.");
-      });
+    const { data: listener } = client.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (event === "SIGNED_IN" && session && !session.user.is_anonymous) {
+        markVerifiedLogin();
+        queueMicrotask(() => {
+          if (active) void enforceSevenDayLogin(client).then((valid) => {
+            if (valid && active) void load();
+          }).catch(() => setStatus("Kunde inte läsa in inloggningen."));
+        });
+      }
+      if (event === "SIGNED_OUT") {
+        clearVerifiedLogin();
+        setLevel(null);
+        setGuestMessages([]);
+      }
+    });
+    void enforceSevenDayLogin(client).then((session) => {
+      if (!active || !session) return;
+      if (session.user.is_anonymous) {
+        void loadGuest().catch(() => setStatus("Kunde inte läsa in det tillfälliga samtalet."));
+      } else {
+        void load().catch(() => setStatus("Inloggningen lyckades men behörigheten kunde inte läsas."));
+      }
+    }).catch(() => {
+      if (active) setStatus("Kunde inte kontrollera inloggningen.");
     });
     return () => {
       active = false;
+      listener.subscription.unsubscribe();
     };
-  }, [load]);
+  }, [load, loadGuest]);
 
   return (
     <div className="space-y-4">
       {level === null ? (
+        <div className="space-y-6">
+          <section aria-label="Prata med Second Claes" className="space-y-3">
+            <h3 className="font-display text-2xl text-primary">Lämna ett meddelande</h3>
+            <p className="text-sm text-muted-foreground">
+              Börja direkt utan inloggning. Ett tillfälligt konto skapas automatiskt när du skickar.
+              Du får ett svar här och kan läsa det igen i samma webbläsare.
+            </p>
+            {guestMessages.map((message) => (
+              <p key={`${message.role}-${message.id}`} className="whitespace-pre-wrap rounded-md border p-3">
+                <strong>{message.role === "assistant" ? "Second Claes" : "Du"}:</strong> {message.body}
+              </p>
+            ))}
+            {guestReply && (
+              <p role="note" className="rounded-md border p-3">
+                <strong>Second Claes:</strong> {guestReply}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {PRE_MCP_TEMPLATES.map((template) => (
+                <button key={template.intent} type="button" disabled={busy}
+                  className="rounded-md border px-3 py-2 text-sm"
+                  onClick={() => setGuestReply(preMcpResponse(template.question)?.reply ?? null)}>
+                  {template.question}
+                </button>
+              ))}
+            </div>
+            {guestMessages.length === 0 ? (
+              <form className="space-y-3" onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  const template = preMcpResponse(guestBody);
+                  if (template) {
+                    setGuestReply(template.reply);
+                    setGuestBody("");
+                    return;
+                  }
+                  const client = getAuthClient();
+                  if (!client) throw new Error("Authentication unavailable");
+                  const { data: current } = await client.auth.getSession();
+                  if (!current.session) {
+                    const { error } = await client.auth.signInAnonymously();
+                    if (error) throw error;
+                  } else if (!current.session.user.is_anonymous) {
+                    await load();
+                    setStatus("Du är redan inloggad. Använd din personliga meddelanderuta.");
+                    return;
+                  }
+                  const { data: receipt, error } = await client.rpc("secondself_guest_voicemail", {
+                    message_body: guestBody,
+                  });
+                  if (error) throw error;
+                  setGuestBody("");
+                  setGuestReply(null);
+                  await loadGuest();
+                  setStatus(`Meddelandet är mottaget. Köplats: ${receipt.queue_position}.`);
+                });
+              }}>
+                <label className="block text-sm">Ditt meddelande till First Claes
+                  <textarea required maxLength={4000} value={guestBody} disabled={busy}
+                    onChange={(event) => setGuestBody(event.target.value)} className={inputClass} />
+                </label>
+                <button disabled={!configured || busy || !guestBody.trim()} className={buttonClass}>
+                  Skicka meddelande
+                </button>
+              </form>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Meddelandet är sparat. Logga in med e-post för att kunna skicka fler.
+              </p>
+            )}
+          </section>
+          <div className="border-t pt-4">
+            <h3 className="font-display text-2xl text-primary">Logga in med e-post</h3>
+            <p className="text-sm text-muted-foreground">
+              Magisk länk ger en inloggning som sparas i upp till sju dagar i denna webbläsare.
+            </p>
+          </div>
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -152,6 +262,7 @@ export function AccessPanel() {
               : "Sign-in is unavailable until authentication is configured."}
           </p>
         </form>
+        </div>
       ) : (
         <section className="space-y-4" aria-label="Your SecondSelf access">
           <p>Level {level} access · Second Claes</p>
@@ -299,6 +410,7 @@ export function AccessPanel() {
                 setInbox([]);
                 setMessages([]);
                 setSent(false);
+                clearVerifiedLogin();
                 if (error) throw error;
               })
             }
