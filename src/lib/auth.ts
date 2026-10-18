@@ -38,7 +38,10 @@ export async function enforceSevenDayLogin(authClient: SupabaseClient) {
 }
 
 export function markVerifiedLogin() {
-  window.localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
+  const existing = Number(window.localStorage.getItem(LOGIN_AT_KEY));
+  if (!Number.isFinite(existing) || existing <= 0) {
+    window.localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
+  }
 }
 
 export function clearVerifiedLogin() {
