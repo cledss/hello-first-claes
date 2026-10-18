@@ -72,7 +72,7 @@ The landing page must always show, verbatim:
 
 - **Hello Claes**
 - "Hej! Jag är Second Claes, the digital representative of First Claes."
-- **+46705121441** (as a `tel:` link)
+- **+46705121441** (plain text, not a clickable phone link; contacts use the application)
 - "How can I help you?"
 - The user-supplied Second Claes AI-network portrait.
 
@@ -83,8 +83,8 @@ The conversation anchor wraps AccessPanel so signed-in and signed-out states sha
 
 | Level | Who | How granted |
 | --- | --- | --- |
-| 0 | Anonymous visitor | Public introduction + request login. |
-| 1 | Verified registered user | Automatically after verified registration. |
+| 0 | Anonymous visitor | Public introduction; temporary anonymous Auth account can leave one message and read its receipt. |
+| 1 | Verified registered user | Automatically after verified registration; persistent magic-link login with seven-day client maximum. |
 | 2+ | Trusted people/agents | Only by explicit, authenticated approval from First Claes. |
 
 ## Security requirements
