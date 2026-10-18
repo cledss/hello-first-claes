@@ -2,6 +2,28 @@
 -- This does not grant Level 1, owner, trusted, or MCP privileges.
 begin;
 
+-- Server-enforced maximum age for verified magic-link sessions.
+-- Refreshing an access token cannot extend the original session age.
+create or replace function secondself.require_access(required_level integer default 1) returns uuid
+language plpgsql security definer set search_path = '' as $
+declare caller uuid := auth.uid();
+begin
+  if caller is null or not exists (
+    select 1 from auth.users u join secondself.grants g on g.user_id = u.id
+    where u.id = caller and u.email_confirmed_at is not null and u.email is not null
+      and not coalesce(u.is_anonymous, false)
+      and (u.banned_until is null or u.banned_until <= now())
+      and g.revoked_at is null and g.level >= required_level
+      and exists (select 1 from auth.sessions s where s.user_id = caller
+        and s.id::text = auth.jwt()->>'session_id'
+        and s.created_at > now() - interval '7 days'
+        and (s.not_after is null or s.not_after > now()))
+  ) then raise exception 'Access denied' using errcode = '42501'; end if;
+  return caller;
+end;
+$;
+revoke all on function secondself.require_access(integer) from public, anon, authenticated;
+
 create function secondself.require_guest() returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
