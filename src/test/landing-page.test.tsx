@@ -14,10 +14,8 @@ describe("Landing page", () => {
     expect(
       screen.getByText("Hej! Jag är Second Claes, the digital representative of First Claes."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "+46705121441" })).toHaveAttribute(
-      "href",
-      "tel:+46705121441",
-    );
+    expect(screen.getByText("+46705121441")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "+46705121441" })).not.toBeInTheDocument();
     expect(screen.getByText("How can I help you?")).toBeInTheDocument();
   });
 
