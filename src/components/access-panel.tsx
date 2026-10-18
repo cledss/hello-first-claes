@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier -- temporary until formatter pass */
 import { useCallback, useEffect, useState } from "react";
 import { clearVerifiedLogin, enforceSevenDayLogin, getAuthClient, markVerifiedLogin } from "@/lib/auth";
 import type { ConversationMessage } from "@/lib/second-claes";
