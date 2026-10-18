@@ -41,12 +41,9 @@ function Index() {
           <p className="mt-3 max-w-md text-base text-muted-foreground">
             Hej! Jag är Second Claes, the digital representative of First Claes.
           </p>
-          <a
-            href="tel:+46705121441"
-            className="mt-3 inline-block text-base font-medium text-accent-blue hover:underline"
-          >
+          <span className="mt-3 inline-block text-base font-medium text-accent-blue">
             +46705121441
-          </a>
+          </span>
           <p className="mt-4 font-display text-xl text-primary">How can I help you?</p>
           <Button asChild size="lg" className="mt-4 w-full sm:w-auto">
             <a href="#conversation">
