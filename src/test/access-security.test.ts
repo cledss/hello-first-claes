@@ -30,7 +30,8 @@ beforeAll(async () => {
     create schema auth;
     create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz,
       is_anonymous boolean default false, banned_until timestamptz, raw_user_meta_data jsonb);
-    create table auth.sessions (id uuid primary key, user_id uuid references auth.users, not_after timestamptz);
+    create table auth.sessions (id uuid primary key, user_id uuid references auth.users, not_after timestamptz,
+      created_at timestamptz not null default now());
     create function auth.jwt() returns jsonb language sql stable as
       $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
     create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt()->>'sub')::uuid $$;
@@ -48,6 +49,8 @@ beforeAll(async () => {
     throw error;
   }
   await db.exec(readFileSync("database/migrations/20261017_voicemail_queue.sql", "utf8"));
+  await db.exec(readFileSync("database/migrations/20261018_guest_first_message.sql", "utf8"));
+  await db.exec(readFileSync("database/migrations/20261109_guest_queue_hardening.sql", "utf8"));
   for (const [id, verified] of [
     [alice, true],
     [bob, true],
@@ -240,6 +243,128 @@ describe.sequential("SecondSelf database authorization", () => {
     expect(audit.rows.map((row) => row.event)).toContain("level_approved");
     expect(audit.rows.map((row) => row.event)).toContain("access_revoked");
     await login(alice);
+    await expect(db.query("select public.secondself_access()")).rejects.toThrow(/Access denied/);
+  });
+});
+
+const carol = "00000000-0000-4000-8000-000000000005";
+const guestId = (n: number) => `00000000-0000-4000-8000-${String(100 + n).padStart(12, "0")}`;
+
+async function addUser(id: string, email: string | null, anonymous: boolean) {
+  await db.exec("reset role");
+  await db.query(
+    "insert into auth.users(id,email,email_confirmed_at,is_anonymous) values ($1,$2,$3,$4)",
+    [id, email, email ? "2026-01-01T00:00:00Z" : null, anonymous],
+  );
+  await db.query("insert into auth.sessions(id,user_id) values ($1,$1)", [id]);
+}
+
+describe.sequential("SecondSelf guest (temporary account) queue", () => {
+  beforeAll(async () => {
+    await addUser(carol, `${carol}@example.invalid`, false);
+    for (let n = 0; n < 30; n++) await addUser(guestId(n), null, true);
+  });
+
+  it("lets a temporary account leave exactly one message and read only its own receipt", async () => {
+    await login(null, "anon");
+    await expect(db.query("select public.secondself_guest_voicemail('Hi')")).rejects.toThrow(
+      /permission denied/,
+    );
+    await login(guestId(0));
+    const sent = await db.query<{ receipt: { queue_position: number } }>(
+      "select public.secondself_guest_voicemail('Guest hello') as receipt",
+    );
+    expect(sent.rows[0]!.receipt.queue_position).toBeGreaterThan(0);
+    await expect(
+      db.query("select public.secondself_guest_voicemail('Second try')"),
+    ).rejects.toThrow(/Temporary account limit/);
+    const own = await db.query<{ c: { body: string }[] }>(
+      "select public.secondself_guest_conversation() as c",
+    );
+    expect(own.rows[0]!.c.map((m) => m.body)).toContain("Guest hello");
+    expect(own.rows[0]!.c.some((m) => m.body === "Please call me")).toBe(false);
+
+    await login(guestId(1));
+    const other = await db.query<{ c: { body: string }[] }>(
+      "select public.secondself_guest_conversation() as c",
+    );
+    expect(other.rows[0]!.c).toEqual([]);
+  });
+
+  it("keeps guests out of Level 1 and verified users out of the guest path", async () => {
+    await login(guestId(1));
+    for (const call of [
+      "select public.secondself_access()",
+      "select public.secondself_conversation()",
+      "select public.secondself_voicemail('x')",
+      "select public.secondself_owner_inbox()",
+    ]) {
+      await expect(db.query(call)).rejects.toThrow(/Access denied/);
+    }
+    await login(carol);
+    await expect(db.query("select public.secondself_guest_voicemail('x')")).rejects.toThrow(
+      /Temporary account required/,
+    );
+  });
+
+  it("shows the owner which pending messages came from guests", async () => {
+    await login(owner);
+    const inbox = await db.query<{
+      inbox: { body: string; email: string | null; is_guest: boolean }[];
+    }>("select public.secondself_owner_inbox() as inbox");
+    expect(inbox.rows[0]!.inbox).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ body: "Guest hello", email: null, is_guest: true }),
+      ]),
+    );
+    expect(inbox.rows[0]!.inbox.filter((m) => !m.is_guest).every((m) => m.email)).toBe(true);
+  });
+
+  it("caps guest messages per hour across rotated temporary accounts", async () => {
+    for (let n = 1; n < 20; n++) {
+      await login(guestId(n));
+      await db.query("select public.secondself_guest_voicemail($1)", [`Guest ${n}`]);
+    }
+    await login(guestId(20));
+    await expect(
+      db.query("select public.secondself_guest_voicemail('one too many')"),
+    ).rejects.toThrow(/Guest limit/);
+  });
+
+  it("caps pending guest messages so verified visitors keep queue capacity", async () => {
+    await db.exec("reset role");
+    await db.exec(`
+      update secondself.voicemail_queue set queued_at = now() - interval '2 hours'
+        where user_id in (select id from auth.users where is_anonymous);
+      do $$
+      declare g uuid; m bigint;
+      begin
+        for i in 1..30 loop
+          g := gen_random_uuid();
+          insert into auth.users(id, is_anonymous) values (g, true);
+          insert into secondself.messages(user_id, body) values (g, 'filler') returning id into m;
+          insert into secondself.voicemail_queue(message_id, user_id, queued_at)
+            values (m, g, now() - interval '2 hours');
+        end loop;
+      end $$;
+    `);
+    await login(guestId(21));
+    await expect(db.query("select public.secondself_guest_voicemail('blocked')")).rejects.toThrow(
+      /Guest limit: guest queue is full/,
+    );
+    await login(carol);
+    const sent = await db.query<{ receipt: { message_id: number } }>(
+      "select public.secondself_voicemail('Verified still gets through') as receipt",
+    );
+    expect(sent.rows[0]!.receipt.message_id).toBeGreaterThan(0);
+  });
+
+  it("rejects verified sessions older than seven days on the server", async () => {
+    await db.exec("reset role");
+    await db.query("update auth.sessions set created_at = now() - interval '8 days' where id=$1", [
+      carol,
+    ]);
+    await login(carol);
     await expect(db.query("select public.secondself_access()")).rejects.toThrow(/Access denied/);
   });
 });
