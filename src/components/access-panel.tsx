@@ -4,7 +4,13 @@ import { clearVerifiedLogin, enforceSevenDayLogin, getAuthClient, markVerifiedLo
 import type { ConversationMessage } from "@/lib/second-claes";
 import { PRE_MCP_TEMPLATES, preMcpResponse } from "@/lib/pre-mcp";
 
-type OwnerMessage = { message_id: number; queued_at: string; body: string; email: string };
+type OwnerMessage = {
+  message_id: number;
+  queued_at: string;
+  body: string;
+  email: string | null;
+  is_guest?: boolean;
+};
 
 export function AccessPanel() {
   const [guestBody, setGuestBody] = useState("");
@@ -36,6 +42,8 @@ export function AccessPanel() {
       const detail = error instanceof Error ? error.message : "";
       if (detail.includes("Temporary account limit")) {
         setStatus("Tillfälliga konton kan skicka ett meddelande. Logga in för fler.");
+      } else if (detail.includes("Guest limit")) {
+        setStatus("Många gästmeddelanden just nu. Logga in med e-post eller försök senare.");
       } else if (detail.includes("Rate limit")) {
         setStatus("För många meddelanden. Försök igen om en stund.");
       } else if (detail.includes("Queue limit") || detail.includes("Queue temporarily full")) {
@@ -358,7 +366,11 @@ export function AccessPanel() {
               <ul>
                 {inbox.map((item) => (
                   <li key={item.message_id} className="border-b py-2">
-                    <p className="text-sm">{item.email}</p>
+                    <p className="text-sm">
+                      {item.is_guest || !item.email ? "Gäst (tillfälligt konto)" : item.email}
+                      {" · "}
+                      {new Date(item.queued_at).toLocaleString("sv-SE")}
+                    </p>
                     <p className="whitespace-pre-wrap">{item.body}</p>
                     <button
                       type="button"

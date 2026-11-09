@@ -148,3 +148,27 @@ are not added to First Claes's queue and do not consume the voicemail rate limit
 Other submitted text is treated as a message to First Claes, queued transactionally
 and acknowledged only after a successful database write. This is an initial text
 protocol, not a live MCP endpoint, agent authentication, or general-purpose chatbot.
+
+## Guest queue hardening
+
+Apply `database/migrations/20261018_guest_first_message.sql`, then
+`database/migrations/20261109_guest_queue_hardening.sql`.
+
+Temporary (anonymous) accounts are cheap to create, so the one-message-per-guest rule
+alone would let a script rotate identities and fill the 200-message global queue. Guests
+therefore share a smaller, database-enforced budget:
+
+- **50 pending guest messages** at most, so verified visitors always keep at least 150 slots.
+- **20 guest messages per rolling hour** across all temporary accounts.
+
+Rejected guest messages get no receipt and the UI suggests signing in with email instead.
+The owner inbox now returns `is_guest` and labels those senders "Gäst (tillfälligt konto)",
+since temporary accounts have no email address.
+
+**Human steps (First Claes):**
+
+1. Apply the migration above after review.
+2. Recommended: enable CAPTCHA protection for Auth (Supabase Dashboard → Authentication →
+   Bot and Abuse Protection, Cloudflare Turnstile or hCaptcha) and send the token from
+   `signInAnonymously({ options: { captchaToken } })`. That needs a site key and is not
+   part of this change.

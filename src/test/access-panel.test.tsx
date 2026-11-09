@@ -170,4 +170,41 @@ describe("email access flow", () => {
     );
     expect(client.rpc).not.toHaveBeenCalled();
   });
+
+  it("labels guest messages in the owner inbox instead of showing a blank sender", async () => {
+    client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "owner-token", user: { is_anonymous: false } } },
+      error: null,
+    });
+    client.rpc.mockImplementation(async (name: string) => ({
+      error: null,
+      data:
+        name === "secondself_access"
+          ? { level: 1, is_owner: true }
+          : name === "secondself_owner_inbox"
+            ? [
+                { message_id: 1, queued_at: "2026-11-09T10:00:00Z", body: "From a guest", email: null, is_guest: true },
+                { message_id: 2, queued_at: "2026-11-09T11:00:00Z", body: "From Anna", email: "anna@example.invalid", is_guest: false },
+              ]
+            : [],
+    }));
+    render(<AccessPanel />);
+    await screen.findByText("From a guest");
+    expect(screen.getByText(/Gäst \(tillfälligt konto\)/)).toBeInTheDocument();
+    expect(screen.getByText(/anna@example\.invalid/)).toBeInTheDocument();
+  });
+
+  it("explains the guest limit without claiming the message was sent", async () => {
+    client.auth.signInAnonymously.mockResolvedValue({ data: { user: { is_anonymous: true } }, error: null });
+    client.rpc.mockResolvedValue({ data: null, error: new Error("Guest limit: guest queue is full") });
+    render(<AccessPanel />);
+    fireEvent.change(screen.getByLabelText("Ditt meddelande till First Claes"), {
+      target: { value: "Hello" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Skicka meddelande" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Många gästmeddelanden just nu"),
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent("mottaget");
+  });
 });
